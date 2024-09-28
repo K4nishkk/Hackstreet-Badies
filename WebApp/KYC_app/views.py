@@ -45,23 +45,28 @@ def process_image(image_data):
     try:
         # Decode the base64 image data
         image_data = image_data.split(',')[1]  # Extract base64 part of the image data URL
+        # print(image_data)
         image_data = base64.b64decode(image_data)  # Decode the base64 to binary
 
         # Convert the binary image data to a PIL Image
         image = Image.open(BytesIO(image_data))
+        # print(image)
         image_np = np.array(image)
 
         # Example placeholder for the image processing
         # Convert RGB to BGR format for OpenCV
         frame = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+        # print(frame)
 
         # Perform face and blink detection (you should replace this with your actual detection logic)
         faces = detector(frame)
+        # print(faces)
         if len(faces) == 0:
             return False, "No face detected."
 
         for face in faces:
             shape = predictor(frame, face)
+            print(shape)
             shape_np = np.zeros((68, 2), dtype="int")
             for i in range(0, 68):
                 shape_np[i] = (shape.part(i).x, shape.part(i).y)
@@ -103,11 +108,14 @@ def liveness_detection(request):
     if request.method == 'POST':
         try:
             # Decode the incoming JSON body
+            # print(request.body.decode('utf-8'))
             body = json.loads(request.body.decode('utf-8'))
             image_data = body.get('image_data')
+            # print(image_data)
 
             # Process the frame for liveness detection
             is_live, message = process_image(image_data)
+            # print(is_live, message)
 
             # Create response message
             response_message = "Liveness Detected: " + str(is_live) + ". " + message
