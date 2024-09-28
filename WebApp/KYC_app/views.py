@@ -113,7 +113,8 @@ def liveness_detection(request):
             response_message = "Liveness Detected: " + str(is_live) + ". " + message
             
             # Log the response message for debugging
-            logger.info(response_message)
+            # logger.info(response_message)
+            print(response_message)
 
             # Return plain text response
             return HttpResponse(response_message, content_type='text/plain')

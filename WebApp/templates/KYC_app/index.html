@@ -1,60 +1,64 @@
 <!-- templates/webcam_app/index.html -->
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Live Camera Feed</title>
-</head>
-<body>
+  </head>
+  <body>
     <h1>Live Camera Feed</h1>
     <video id="video" width="640" height="480" autoplay></video>
     <button id="capture">Capture Image</button>
-    <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
+    <canvas id="canvas" width="640" height="480" style="display: none"></canvas>
 
     <script>
-        // Access the webcam
-        const video = document.getElementById('video');
-        let intervalId;
-    
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            navigator.mediaDevices.getUserMedia({ video: true }).then(function (stream) {
-                video.srcObject = stream;
-                video.play();
-            });
-        }
-    
-        // Function to capture video frames and send to backend
-        function sendFrame() {
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const imageData = canvas.toDataURL('image/png');
-    
-            // Send the captured frame to the Django backend
-            fetch('/liveness_detection/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token }}'
-                },
-                body: JSON.stringify({
-                    'image_data': imageData
-                })
-            }).then(response => {
-                return response.json();
-            }).then(data => {
-                console.log('Liveness Detection Result:', data);
-            }).catch((error) => {
-                console.error('Error:', error);
-            });
-        }
-    
-        // Capture and send frames every 1 second
-        intervalId = setInterval(sendFrame, 1000); // 1 frame per second
+      // Access the webcam
+      const video = document.getElementById('video')
+      let intervalId
+
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices
+          .getUserMedia({ video: true })
+          .then(function (stream) {
+            video.srcObject = stream
+            video.play()
+          })
+      }
+
+      // Function to capture video frames and send to backend
+      function sendFrame() {
+        const canvas = document.createElement('canvas')
+        const context = canvas.getContext('2d')
+        canvas.width = video.videoWidth
+        canvas.height = video.videoHeight
+        context.drawImage(video, 0, 0, canvas.width, canvas.height)
+        const imageData = canvas.toDataURL('image/png')
+
+        // Send the captured frame to the Django backend
+        fetch('/liveness_detection/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}',
+          },
+          body: JSON.stringify({
+            image_data: imageData,
+          }),
+        })
+          .then((response) => {
+            return response.json()
+          })
+          .then((data) => {
+            console.log('Liveness Detection Result:', data)
+          })
+          .catch((error) => {
+            console.error('Error:', error)
+          })
+      }
+
+      // Capture and send frames every 1 second
+      intervalId = setInterval(sendFrame, 1000) // 1 frame per second
     </script>
-    
-</body>
+  </body>
 </html>
