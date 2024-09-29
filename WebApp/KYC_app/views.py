@@ -9,6 +9,9 @@ from django.shortcuts import render
 import json
 import logging
 import os
+from django.views.decorators.csrf import csrf_exempt
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -131,13 +134,14 @@ def liveness_detection(request):
             # Process the frame for liveness detection
             is_live, message, image = process_image(image_data)
             # print(is_live, message)
-# Update the list of last 10 frames
+
+            # Update the list of last 10 frames
             if len(last_10_frames) >= 10:
                 last_10_frames.pop(0)  # Remove the oldest frame status
             last_10_frames.append(is_live)  # Add the current frame's liveness status
 
-            # Check if 8 out of the last 10 frames are live
-            if last_10_frames.count(True) >= 8:
+            # Check if 2 out of the last 10 frames are live
+            if last_10_frames.count(True) >= 2:
                 # Save the image
                 image_filename = f"captured_image_{len(os.listdir(IMAGE_SAVE_PATH)) + 1}.png"
                 image_save_path = os.path.join(IMAGE_SAVE_PATH, image_filename)
@@ -169,3 +173,17 @@ def liveness_detection(request):
             return HttpResponse(error_message, status=500, content_type='text/plain')
 
     return HttpResponse('Invalid request method.', status=400, content_type='text/plain')
+
+@csrf_exempt
+def upload_document(request):
+    if request.method == 'POST' and request.FILES.get('file'):
+        uploaded_file = request.FILES['file']
+        
+        # Set a save path (e.g., to media directory)
+        save_path = os.path.join('media', uploaded_file.name)
+
+        # Save the file to the specified location
+        path = default_storage.save(save_path, ContentFile(uploaded_file.read()))
+        
+        return JsonResponse({'message': 'File uploaded successfully!', 'path': path})
+    return JsonResponse({'error': 'Invalid request or no file provided.'}, status=400)
