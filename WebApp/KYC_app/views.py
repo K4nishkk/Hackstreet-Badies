@@ -8,6 +8,7 @@ from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render
 import json
 import logging
+import os
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -41,6 +42,18 @@ predictor = dlib.shape_predictor("KYC_app/models/shape_predictor_68_face_landmar
 LEFT_EYE_POINTS = list(range(36, 42))
 RIGHT_EYE_POINTS = list(range(42, 48))
 
+
+# Keep track of the last 8 frames' results for liveness detection
+last_10_frames = []
+
+# Path to save captured images
+IMAGE_SAVE_PATH = 'KYC_app/static/captured_images/'  # Adjust the path as needed
+
+# Ensure the save path directory exists
+if not os.path.exists(IMAGE_SAVE_PATH):
+    os.makedirs(IMAGE_SAVE_PATH)
+
+
 def process_image(image_data):
     try:
         # Decode the base64 image data
@@ -62,22 +75,22 @@ def process_image(image_data):
         faces = detector(frame)
         # print(faces)
         if len(faces) == 0:
-            return False, "No face detected."
+            return False, "No face detected.", None
 
         for face in faces:
             shape = predictor(frame, face)
-            print(shape)
+            # print(shape)
             shape_np = np.zeros((68, 2), dtype="int")
             for i in range(0, 68):
                 shape_np[i] = (shape.part(i).x, shape.part(i).y)
 
             blink_detected = check_blink(shape_np)
             if blink_detected:
-                return True, "Blink detected, person is alive."
+                return True, "Blink detected, person is alive.", image
 
-        return False, "No blink detected, might be a spoof."
+        return False, "No blink detected, might be a spoof.", None
     except Exception as e:
-        return False, f"Error processing image: {str(e)}"
+        return False, f"Error processing image: {str(e)}", None
 
 
 def check_blink(shape):
@@ -105,6 +118,8 @@ def check_blink(shape):
     return False
 
 def liveness_detection(request):
+    global last_10_frames
+
     if request.method == 'POST':
         try:
             # Decode the incoming JSON body
@@ -114,8 +129,25 @@ def liveness_detection(request):
             # print(image_data)
 
             # Process the frame for liveness detection
-            is_live, message = process_image(image_data)
+            is_live, message, image = process_image(image_data)
             # print(is_live, message)
+# Update the list of last 10 frames
+            if len(last_10_frames) >= 10:
+                last_10_frames.pop(0)  # Remove the oldest frame status
+            last_10_frames.append(is_live)  # Add the current frame's liveness status
+
+            # Check if 8 out of the last 10 frames are live
+            if last_10_frames.count(True) >= 8:
+                # Save the image
+                image_filename = f"captured_image_{len(os.listdir(IMAGE_SAVE_PATH)) + 1}.png"
+                image_save_path = os.path.join(IMAGE_SAVE_PATH, image_filename)
+                image.save(image_save_path)
+
+                # Clear the frame history after capturing
+                last_10_frames = []
+
+                # Append to the message that an image was saved
+                message += f" Image saved as {image_filename}."
 
             # Create response message
             response_message = "Liveness Detected: " + str(is_live) + ". " + message
