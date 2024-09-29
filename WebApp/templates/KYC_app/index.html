@@ -13,6 +13,12 @@
     <button id="capture">Capture Image</button>
     <canvas id="canvas" width="640" height="480" style="display: none"></canvas>
 
+    <!-- Section to display the captured image -->
+    <div id="imageSection" style="display: none">
+      <h2>Captured Image</h2>
+      <img id="capturedImage" src="" alt="Captured Image" width="640" height="480" />
+    </div>
+
     <!-- Upload button, initially hidden -->
     <div id="uploadSection" style="display: none">
       <h2>Upload Image</h2>
@@ -90,6 +96,15 @@
             if (aliveCount >= livenessThreshold) {
               console.log('Stop') // Log to console when condition is met
               clearInterval(intervalId) // Stop sending frames
+
+              // Check if there is a saved image URL
+              const imageUrl = data.match(/Image saved as (.+\.png)/)
+              if (imageUrl) {
+                const imagePath = '/static/captured_images/' + imageUrl[1]
+                // Set the image source to the captured image and display it
+                document.getElementById('capturedImage').src = imagePath
+                document.getElementById('imageSection').style.display = 'block'
+              }
 
               // Show the upload button section
               document.getElementById('uploadSection').style.display = 'block'
