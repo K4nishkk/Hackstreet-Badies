@@ -10,20 +10,29 @@
   <body>
     <h1>Live Camera Feed</h1>
     <video id="video" width="640" height="480" autoplay></video>
-    <button id="capture">Capture Image</button>
     <canvas id="canvas" width="640" height="480" style="display: none"></canvas>
 
     <!-- Section to display the captured image -->
     <div id="imageSection" style="display: none">
       <h2>Captured Image</h2>
-      <img id="capturedImage" src="" alt="Captured Image" width="640" height="480" />
+      <img
+        id="capturedImage"
+        src=""
+        alt="Captured Image"
+        width="640"
+        height="480"
+      />
     </div>
 
-    <!-- Upload button, initially hidden -->
-    <div id="uploadSection" style="display: none">
+    <!-- Section to display the uploaded and processed image -->
+    <div id="uploadSection">
       <h2>Upload Image</h2>
       <input type="file" id="uploadImage" accept="image/*" />
       <button id="submitUpload">Submit</button>
+      <div id="uploadedImageSection" style="display: none">
+        <h3>Detected Face</h3>
+        <img id="processedFaceImage" src="" alt="Detected Face" />
+      </div>
     </div>
 
     <script>
@@ -117,6 +126,50 @@
 
       // Capture and send frames every 1 second
       intervalId = setInterval(sendFrame, 1000) // 1 frame per second
+
+      const uploadButton = document.getElementById('submitUpload')
+      const uploadImageInput = document.getElementById('uploadImage')
+      uploadButton.addEventListener('click', () => {
+        const file = uploadImageInput.files[0]
+        if (!file) {
+          alert('Please upload an image first.')
+          return
+        }
+
+        const formData = new FormData()
+        formData.append('file', file)
+
+        // Send the uploaded image to the backend for face detection
+        fetch('/upload_document/', {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': getCSRFToken(), // Only set the CSRF token header, not Content-Type
+          },
+          body: formData,
+        })
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error('Upload failed')
+            }
+            return response.json()
+          })
+          .then((data) => {
+            if (data.error) {
+              alert('Face detection failed: ' + data.error)
+            } else {
+              // Display the detected face image
+              const imageUrl = data.path
+              const processedFaceImage =
+                document.getElementById('processedFaceImage')
+              processedFaceImage.src = imageUrl
+              document.getElementById('uploadedImageSection').style.display =
+                'block'
+            }
+          })
+          .catch((error) => {
+            console.error('Error:', error)
+          })
+      })
     </script>
   </body>
 </html>

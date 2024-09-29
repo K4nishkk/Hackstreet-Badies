@@ -51,10 +51,14 @@ last_10_frames = []
 
 # Path to save captured images
 IMAGE_SAVE_PATH = 'KYC_app/static/captured_images/'  # Adjust the path as needed
+UPLOAD_IMAGE_SAVE_PATH = 'KYC_app/static/processed_faces/'
 
 # Ensure the save path directory exists
 if not os.path.exists(IMAGE_SAVE_PATH):
     os.makedirs(IMAGE_SAVE_PATH)
+
+if not os.path.exists(UPLOAD_IMAGE_SAVE_PATH):
+    os.makedirs(UPLOAD_IMAGE_SAVE_PATH)
 
 
 def process_image(image_data):
@@ -173,16 +177,81 @@ def liveness_detection(request):
 
     return HttpResponse('Invalid request method.', status=400, content_type='text/plain')
 
-@csrf_exempt
-def upload_document(request):
-    if request.method == 'POST' and request.FILES.get('file'):
-        uploaded_file = request.FILES['file']
-        
-        # Set a save path (e.g., to media directory)
-        save_path = os.path.join('media', uploaded_file.name)
+def detect_face(image_path):
+    try:
+        # Load the image
+        image = cv2.imread(image_path)
 
-        # Save the file to the specified location
-        path = default_storage.save(save_path, ContentFile(uploaded_file.read()))
+        if image is None:
+            raise ValueError("Unable to read the image.")
+
+        # Convert to grayscale for face detection
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # Detect faces
+        faces = detector(gray)
+
+        if len(faces) == 0:
+            return None  # No face detected
+
+        # For simplicity, let's just process the first detected face
+        face = faces[0]
+
+        # Get the coordinates of the detected face
+        x, y, w, h = face.left(), face.top(), face.width(), face.height()
+
+        # Crop the face from the image
+        face_image = image[y:y + h, x:x + w]
+
+        # Convert back to RGB for saving with PIL
+        face_image_rgb = cv2.cvtColor(face_image, cv2.COLOR_BGR2RGB)
+        face_pil = Image.fromarray(face_image_rgb)
+
+        # Generate a unique filename for the face image
+        face_filename = f"face_{os.path.basename(image_path)}"
+        face_save_path = os.path.join(IMAGE_SAVE_PATH, face_filename)
+
+        # Save the face image using PIL
+        face_pil.save(face_save_path)
+
+        # Return the path where the face image is stored
+        return os.path.join('/KYC_app/static/processed_faces', face_filename)
+
+    except Exception as e:
+        print(f"Error detecting face: {str(e)}")
+        return None
+
+def upload_document(request):
+    if request.method == 'POST':
+        print("Received POST request.")
         
-        return JsonResponse({'message': 'File uploaded successfully!', 'path': path})
-    return JsonResponse({'error': 'Invalid request or no file provided.'}, status=400)
+        # Check if the file is being received
+        if 'file' not in request.FILES:
+            print("No file found in request.")
+            return JsonResponse({'error': 'No file provided.'}, status=400)
+        
+        uploaded_file = request.FILES['file']
+        print(f"Uploaded file name: {uploaded_file.name}")
+        
+        try:
+            # Save the uploaded file temporarily
+            save_path = os.path.join('media', uploaded_file.name)
+            print(f"Saving file to: {save_path}")
+            file_path = default_storage.save(save_path, ContentFile(uploaded_file.read()))
+
+            # Perform face detection
+            image_path = default_storage.path(file_path)
+            face_image_path = detect_face(image_path)
+
+            if face_image_path:
+                print(f"Face detected and saved at: {face_image_path}")
+                return JsonResponse({'message': 'Face detected successfully!', 'path': face_image_path})
+            else:
+                print("No face detected.")
+                return JsonResponse({'error': 'No face detected.'}, status=400)
+        except Exception as e:
+            print(f"Error processing file: {e}")
+            return JsonResponse({'error': f'Error processing file: {str(e)}'}, status=500)
+    else:
+        print("Invalid request method.")
+        return JsonResponse({'error': 'Invalid request method.'}, status=400)
